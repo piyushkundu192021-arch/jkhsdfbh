@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DuoChat</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#0d0d0f;--surface:#16161a;--border:#2a2a35;
+      --accent:#ff6b35;--accent2:#7c3aed;
+      --text:#e8e8f0;--muted:#6b6b80;
+      --me:#261f38;--them:#1a2218;
+    }
+    html,body{height:100%;overflow:hidden}
+    body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;display:flex;flex-direction:column;height:100dvh}
+
+    /* ── NAME SCREEN ── */
+    #namescreen{
+      position:fixed;inset:0;background:var(--bg);
+      display:flex;align-items:center;justify-content:center;
+      z-index:50;transition:opacity .3s
+    }
+    #namescreen.gone{opacity:0;pointer-events:none}
+    .card{
+      background:var(--surface);border:1px solid var(--border);
+      border-radius:20px;padding:32px;width:min(340px,90vw);
+      display:flex;flex-direction:column;gap:18px;
+    }
+    .card h2{font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;letter-spacing:-.03em}
+    .card h2 span{color:var(--accent)}
+    .card p{font-size:.75rem;color:var(--muted);line-height:1.7}
+    .card label{font-size:.67rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:5px}
+    .card input{
+      width:100%;background:var(--bg);border:1px solid var(--border);
+      border-radius:9px;padding:11px 14px;color:var(--text);
+      font-family:'DM Mono',monospace;font-size:.88rem;
+      outline:none;transition:border-color .15s
+    }
+    .card input:focus{border-color:var(--accent)}
+    .card button{
+      padding:13px;border-radius:10px;border:none;
+      background:var(--accent);color:#fff;
+      font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;
+      cursor:pointer;transition:opacity .15s,transform .1s
+    }
+    .card button:hover{opacity:.88;transform:translateY(-1px)}
+    .card button:active{transform:translateY(0)}
+
+    /* ── HEADER ── */
+    header{
+      display:flex;align-items:center;justify-content:space-between;
+      padding:12px 16px;background:var(--surface);
+      border-bottom:1px solid var(--border);flex-shrink:0
+    }
+    .logo{font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;letter-spacing:-.03em}
+    .logo span{color:var(--accent)}
+    .hright{display:flex;align-items:center;gap:8px}
+    .who{font-size:.68rem;color:var(--muted)}
+    .who b{color:var(--accent)}
+    .dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:background .3s}
+    .dot.live{background:#22c55e;animation:pulse 2s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+    .connlbl{font-size:.62rem;color:var(--muted)}
+
+    /* ── MESSAGES ── */
+    #msgs{
+      flex:1;overflow-y:auto;
+      padding:14px 14px;
+      display:flex;flex-direction:column;gap:8px;
+      scroll-behavior:smooth
+    }
+    #msgs::-webkit-scrollbar{width:3px}
+    #msgs::-webkit-scrollbar-thumb{background:var(--border);border-radius:99px}
+
+    .row{display:flex;align-items:flex-end;gap:7px;animation:up .18s ease-out}
+    @keyframes up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .row.me{flex-direction:row}
+    .row.them{flex-direction:row-reverse}
+
+    .av{
+      width:32px;height:32px;border-radius:50%;
+      display:grid;place-items:center;
+      font-family:'Syne',sans-serif;font-weight:800;font-size:.74rem;
+      flex-shrink:0
+    }
+    .av.me{background:rgba(255,107,53,.15);color:var(--accent);border:1px solid rgba(255,107,53,.3)}
+    .av.them{background:rgba(124,58,237,.15);color:#a78bfa;border:1px solid rgba(124,58,237,.3)}
+
+    .bwrap{max-width:76%;display:flex;flex-direction:column;gap:2px}
+    .row.them .bwrap{align-items:flex-end}
+
+    .sname{font-size:.58rem;color:var(--muted);padding:0 4px;letter-spacing:.05em;text-transform:uppercase}
+    .row.them .sname{text-align:right}
+
+    .bubble{
+      padding:9px 13px;border-radius:14px;
+      font-size:.82rem;line-height:1.55;word-break:break-word
+    }
+    .bubble.me{
+      background:var(--me);
+      border:1px solid rgba(255,107,53,.18);
+      border-bottom-left-radius:3px
+    }
+    .bubble.them{
+      background:var(--them);
+      border:1px solid rgba(124,58,237,.18);
+      border-bottom-right-radius:3px
+    }
+    .ts{font-size:.58rem;color:var(--muted);padding:0 4px}
+
+    .daysep{
+      text-align:center;font-size:.61rem;color:var(--muted);
+      letter-spacing:.09em;text-transform:uppercase;
+      padding:6px 0;display:flex;align-items:center;gap:8px
+    }
+    .daysep::before,.daysep::after{content:'';flex:1;height:1px;background:var(--border)}
+
+    #empty{
+      flex:1;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;
+      gap:10px;color:var(--muted);font-size:.76rem;text-align:center
+    }
+    #empty .ico{font-size:2rem;opacity:.3}
+
+    /* typing */
+    #typebar{
+      padding:2px 16px 2px 55px;font-size:.64rem;color:var(--muted);
+      min-height:18px;display:none;align-items:center;gap:5px
+    }
+    .tdots span{
+      display:inline-block;width:4px;height:4px;border-radius:50%;
+      background:var(--muted);animation:bnc 1.2s infinite;margin:0 1px
+    }
+    .tdots span:nth-child(2){animation-delay:.2s}
+    .tdots span:nth-child(3){animation-delay:.4s}
+    @keyframes bnc{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-4px)}}
+
+    /* ── INPUT ── */
+    #bar{
+      padding:10px 12px;background:var(--surface);
+      border-top:1px solid var(--border);
+      display:flex;gap:8px;align-items:flex-end;flex-shrink:0
+    }
+    #inp{
+      flex:1;background:var(--bg);border:1px solid var(--border);
+      border-radius:10px;padding:10px 13px;color:var(--text);
+      font-family:'DM Mono',monospace;font-size:.82rem;
+      resize:none;outline:none;transition:border-color .15s;
+      max-height:110px;line-height:1.5
+    }
+    #inp::placeholder{color:var(--muted)}
+    #inp:focus{border-color:var(--accent)}
+    #sndbtn{
+      width:42px;height:42px;border-radius:10px;border:none;
+      background:var(--accent);color:#fff;cursor:pointer;
+      display:grid;place-items:center;transition:transform .12s;flex-shrink:0
+    }
+    #sndbtn:hover{transform:scale(1.07)}
+    #sndbtn:active{transform:scale(.95)}
+    #sndbtn svg{width:17px;height:17px}
+  </style>
+</head>
+<body>
+
+<!-- NAME SCREEN -->
+<div id="namescreen">
+  <div class="card">
+    <h2>duo<span>chat</span> ✦</h2>
+    <p>Enter your name to jump in. The other person does the same on their device.</p>
+    <div>
+      <label>Your name</label>
+      <input type="text" id="nameinp" placeholder="e.g. Alice" maxlength="20" autocomplete="off"/>
+    </div>
+    <button onclick="joinChat()">Start chatting →</button>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">duo<span>chat</span></div>
+  <div class="hright">
+    <div class="who">chatting as <b id="mylabel">—</b></div>
+    <div class="dot" id="dot"></div>
+    <div class="connlbl" id="clbl">connecting…</div>
+  </div>
+</header>
+
+<!-- MESSAGES -->
+<div id="msgs">
+  <div id="empty">
+    <div class="ico">💬</div>
+    <div>No messages yet.<br/>Say something!</div>
+  </div>
+</div>
+
+<!-- TYPING -->
+<div id="typebar">
+  <span id="typername">Someone</span>&nbsp;is typing
+  <div class="tdots"><span></span><span></span><span></span></div>
+</div>
+
+<!-- INPUT -->
+<div id="bar">
+  <textarea id="inp" rows="1" placeholder="Type a message…"></textarea>
+  <button id="sndbtn" onclick="send()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="22" y1="2" x2="11" y2="13"/>
+      <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+    </svg>
+  </button>
+</div>
+
+<script>
+  // ── CONFIG (hardcoded — no setup needed) ──
+  const API_KEY = 'm1KjlWIXKu5VeNhutGv3Q4FH2hPpI1Drb595XniZ';
+  const ROOM    = 'duochat-main-room';
+
+  let ws, myName, typingTimer, typingHideTimer;
+  let lastDay = null;
+
+  // Restore name if returning visitor
+  const saved = localStorage.getItem('dc_name');
+  if (saved) document.getElementById('nameinp').value = saved;
+
+  // Auto-focus name input
+  document.getElementById('nameinp').focus();
+  document.getElementById('nameinp').addEventListener('keydown', e => {
+    if (e.key === 'Enter') joinChat();
+  });
+
+  function joinChat() {
+    const name = document.getElementById('nameinp').value.trim();
+    if (!name) { document.getElementById('nameinp').focus(); return; }
+
+    myName = name;
+    localStorage.setItem('dc_name', name);
+
+    document.getElementById('namescreen').classList.add('gone');
+    document.getElementById('mylabel').textContent = name;
+    document.getElementById('inp').placeholder = `Message as ${name}…`;
+
+    openSocket();
+  }
+
+  function openSocket() {
+    const url = `wss://free.piesocket.com/v3/${encodeURIComponent(ROOM)}?api_key=${API_KEY}&notify_self=1`;
+    ws = new WebSocket(url);
+
+    ws.onopen = () => {
+      setConn(true);
+      document.getElementById('inp').focus();
+    };
+    ws.onclose = () => {
+      setConn(false);
+      // auto-reconnect after 3s
+      setTimeout(openSocket, 3000);
+    };
+    ws.onerror = () => setConn(false);
+
+    ws.onmessage = e => {
+      try {
+        const d = JSON.parse(e.data);
+        if (d.type === 'msg' && d.name !== myName) appendMsg(d, false);
+        if (d.type === 'typing' && d.name !== myName) showTyping(d.name);
+        if (d.type === 'stoptyping') hideTyping();
+      } catch {}
+    };
+  }
+
+  // ── SEND ──
+  function send() {
+    const inp  = document.getElementById('inp');
+    const text = inp.value.trim();
+    if (!text || !ws || ws.readyState !== 1) return;
+
+    const msg = { type: 'msg', text, name: myName, ts: Date.now() };
+    ws.send(JSON.stringify(msg));
+    appendMsg(msg, true); // show my own message immediately
+
+    // stop typing
+    clearTimeout(typingTimer);
+    ws.send(JSON.stringify({ type: 'stoptyping' }));
+
+    inp.value = '';
+    inp.style.height = 'auto';
+  }
+
+  // ── RENDER MESSAGE ──
+  function appendMsg(d, isMe) {
+    const box   = document.getElementById('msgs');
+    const empty = document.getElementById('empty');
+    if (empty) empty.remove();
+
+    // Day separator
+    const day = new Date(d.ts).toDateString();
+    if (day !== lastDay) {
+      lastDay = day;
+      const sep = document.createElement('div');
+      sep.className = 'daysep';
+      sep.textContent = fmtDay(d.ts);
+      box.appendChild(sep);
+    }
+
+    const side = isMe ? 'me' : 'them';
+
+    const row = document.createElement('div');
+    row.className = `row ${side}`;
+
+    const av = document.createElement('div');
+    av.className = `av ${side}`;
+    av.textContent = (d.name || '?')[0].toUpperCase();
+
+    const wrap = document.createElement('div');
+    wrap.className = 'bwrap';
+
+    const sn = document.createElement('div');
+    sn.className = 'sname';
+    sn.textContent = d.name;
+
+    const bub = document.createElement('div');
+    bub.className = `bubble ${side}`;
+    bub.textContent = d.text;
+
+    const ts = document.createElement('div');
+    ts.className = 'ts';
+    ts.textContent = fmtTime(d.ts);
+
+    wrap.append(sn, bub, ts);
+    row.append(av, wrap);
+    box.appendChild(row);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  // ── TYPING ──
+  function showTyping(name) {
+    document.getElementById('typername').textContent = name;
+    document.getElementById('typebar').style.display = 'flex';
+    clearTimeout(typingHideTimer);
+    typingHideTimer = setTimeout(hideTyping, 3000);
+  }
+  function hideTyping() {
+    document.getElementById('typebar').style.display = 'none';
+  }
+
+  // ── TEXTAREA AUTO-RESIZE + ENTER TO SEND ──
+  const inp = document.getElementById('inp');
+  inp.addEventListener('input', function () {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 110) + 'px';
+    if (!ws || ws.readyState !== 1) return;
+    ws.send(JSON.stringify({ type: 'typing', name: myName }));
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(() => {
+      if (ws && ws.readyState === 1)
+        ws.send(JSON.stringify({ type: 'stoptyping' }));
+    }, 2000);
+  });
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+
+  // ── HELPERS ──
+  function setConn(ok) {
+    document.getElementById('dot').className  = 'dot' + (ok ? ' live' : '');
+    document.getElementById('clbl').textContent = ok ? 'live' : 'reconnecting…';
+  }
+  function fmtTime(ts) {
+    return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  function fmtDay(ts) {
+    const d = new Date(ts), now = new Date();
+    if (d.toDateString() === now.toDateString()) return 'Today';
+    const yest = new Date(); yest.setDate(yest.getDate() - 1);
+    if (d.toDateString() === yest.toDateString()) return 'Yesterday';
+    return d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
+  }
+</script>
+</body>
+</html>
